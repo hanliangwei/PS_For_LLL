@@ -1,68 +1,116 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HLW 彩色字母</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background-color: #f0f0f0;
-            font-family: Arial, sans-serif;
-        }
-        
-        .hlw-container {
-            font-size: 20vw; /* 响应式大字体 */
-            font-weight: bold;
-            text-align: center;
-        }
-        
-        .h {
-            color: #FF6B6B; /* 红色 */
-        }
-        
-        .l {
-            color: #4ECDC4; /* 青绿色 */
-        }
-        
-        .w {
-            color: #45B7D1; /* 蓝色 */
-        }
-        
-        /* 额外的动画效果（可选） */
-        .hlw-container span {
-            display: inline-block;
-            animation: float 3s ease-in-out infinite;
-        }
-        
-        .l {
-            animation-delay: 0.5s;
-        }
-        
-        .w {
-            animation-delay: 1s;
-        }
-        
-        @keyframes float {
-            0%, 100% {
-                transform: translateY(0);
-            }
-            50% {
-                transform: translateY(-10px);
-            }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>秘塔</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+    #input-container {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    #question-input {
+      flex: 1;
+      padding: 10px;
+      font-size: 16px;
+    }
+    #send-btn {
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    #send-btn:hover {
+      background-color: #0056b3;
+    }
+    #result-container {
+      border: 1px solid #ccc;
+      padding: 15px;
+      background-color: #f9f9f9;
+      white-space: pre-wrap;
+      font-family: monospace;
+      line-height: 1.5;
+    }
+    .loading {
+      color: #666;
+    }
+  </style>
 </head>
 <body>
-    <div class="hlw-container">
-        <span class="h">L</span>
-        <span class="l">L</span>
-        <span class="w">L</span>
-    </div>
+
+<h2>输入问题</h2>
+
+<div id="input-container">
+  <input type="text" id="question-input" placeholder="请输入你的问题..." value="" />
+  <button id="send-btn">发送</button>
+</div>
+
+<div id="result-container">点击“发送”后，结果将显示在这里...</div>
+
+<script>
+  document.getElementById('send-btn').addEventListener('click', async () => {
+    const input = document.getElementById('question-input').value.trim();
+    if (!input) {
+      alert('请输入问题！');
+      return;
+    }
+
+    const resultDiv = document.getElementById('result-container');
+    resultDiv.textContent = '加载中...';
+    resultDiv.className = 'loading';
+
+    const myHeaders = new Headers();
+    myHeaders.append("Authorization", "Bearer mk-6110A22EFC6EC6B16A13005E23CA3112");
+    myHeaders.append("Accept", "application/json");
+    myHeaders.append("Content-Type", "application/json");
+
+    const raw = JSON.stringify({
+      "q": input,
+      "scope": "webpage",
+      "includeSummary": false,
+      "size": "10",
+      "includeRawContent": false,
+      "conciseSnippet": false
+    });
+
+    const requestOptions = {
+      method: "POST",
+      headers: myHeaders,
+      body: raw,
+      redirect: "follow"
+    };
+
+    try {
+      const response = await fetch("https://metaso.cn/api/v1/search", requestOptions);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const result = await response.json();
+
+      if (result.webpages && result.webpages.length > 0) {
+        const firstSnippet = result.webpages[0].snippet || "无内容";
+        // 简单模拟 Markdown 显示（实际可用 marked.js 等渲染）
+        resultDiv.innerHTML = `<strong>来源：</strong><a href="${result.webpages[0].link}" target="_blank">${result.webpages[0].title}</a><br><br>` +
+                              `<pre>${firstSnippet}</pre>`;
+        resultDiv.className = '';
+      } else {
+        resultDiv.textContent = '未找到结果。';
+        resultDiv.className = '';
+      }
+    } catch (error) {
+      console.error(error);
+      resultDiv.textContent = '请求出错：' + error.message;
+      resultDiv.className = '';
+    }
+  });
+</script>
+
 </body>
 </html>
