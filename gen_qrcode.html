@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>腾讯视频链接转二维码</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+        
+        .input-group {
+            margin-bottom: 25px;
+        }
+        
+        label {
+            display: block;
+            color: #555;
+            font-weight: 600;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .result {
+            margin-top: 30px;
+            display: none;
+        }
+        
+        .result.show {
+            display: block;
+        }
+        
+        .clean-url {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            word-break: break-all;
+            font-size: 14px;
+            color: #333;
+        }
+        
+        .qrcode-container {
+            text-align: center;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 10px;
+        }
+        
+        #qrcode {
+            display: inline-block;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+        }
+        
+        .error {
+            color: #e74c3c;
+            background: #fef5f5;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            display: none;
+            font-size: 14px;
+        }
+        
+        .error.show {
+            display: block;
+        }
+        
+        @media (max-width: 480px) {
+            .container {
+                padding: 25px;
+            }
+            
+            h1 {
+                font-size: 22px;
+            }
+            
+            input[type="text"], button {
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 腾讯视频链接转二维码</h1>
+        
+        <div class="input-group">
+            <label for="urlInput">请输入腾讯视频链接</label>
+            <input type="text" 
+                   id="urlInput" 
+                   placeholder="https://m.v.qq.com/x/m/play?lid=&cid=mzc00200qwso750&vid=j4101x4hih5&ptag=share_11_11...">
+        </div>
+        
+        <button onclick="generateQRCode()">生成二维码</button>
+        
+        <div class="error" id="error"></div>
+        
+        <div class="result" id="result">
+            <h3 style="margin-bottom: 15px; color: #333;">简化后的链接：</h3>
+            <div class="clean-url" id="cleanUrl"></div>
+            
+            <div class="qrcode-container">
+                <div id="qrcode"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <script>
+        function generateQRCode() {
+            const input = document.getElementById('urlInput').value.trim();
+            const errorDiv = document.getElementById('error');
+            const resultDiv = document.getElementById('result');
+            const cleanUrlDiv = document.getElementById('cleanUrl');
+            const qrcodeDiv = document.getElementById('qrcode');
+            
+            // 隐藏之前的结果和错误
+            errorDiv.classList.remove('show');
+            resultDiv.classList.remove('show');
+            qrcodeDiv.innerHTML = '';
+            
+            if (!input) {
+                errorDiv.textContent = '请输入链接';
+                errorDiv.classList.add('show');
+                return;
+            }
+            
+            try {
+                const url = new URL(input);
+                
+                // 检查是否是腾讯视频链接
+                if (!url.hostname.includes('v.qq.com')) {
+                    errorDiv.textContent = '请输入有效的腾讯视频链接';
+                    errorDiv.classList.add('show');
+                    return;
+                }
+                
+                // 获取vid参数
+                const vid = url.searchParams.get('vid');
+                
+                if (!vid) {
+                    errorDiv.textContent = '链接中未找到vid参数';
+                    errorDiv.classList.add('show');
+                    return;
+                }
+                
+                // 构建新的URL
+                const cleanUrl = `${url.origin}${url.pathname}?vid=${vid}`;
+                
+                // 显示结果
+                cleanUrlDiv.textContent = cleanUrl;
+                resultDiv.classList.add('show');
+                
+                // 生成二维码
+                new QRCode(qrcodeDiv, {
+                    text: cleanUrl,
+                    width: 200,
+                    height: 200,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+                
+            } catch (e) {
+                errorDiv.textContent = '无效的URL格式，请检查输入的链接';
+                errorDiv.classList.add('show');
+            }
+        }
+        
+        // 按Enter键也能生成二维码
+        document.getElementById('urlInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                generateQRCode();
+            }
+        });
+    </script>
+</body>
+</html>
