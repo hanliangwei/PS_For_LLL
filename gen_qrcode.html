@@ -64,6 +64,45 @@
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
         
+        .correction-level {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .correction-level input[type="radio"] {
+            display: none;
+        }
+        
+        .correction-level label {
+            flex: 1;
+            min-width: 100px;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+            font-size: 13px;
+        }
+        
+        .correction-level input[type="radio"]:checked + label {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+        }
+        
+        .correction-level label:hover {
+            border-color: #667eea;
+        }
+        
+        .level-description {
+            font-size: 12px;
+            color: #888;
+            margin-top: 8px;
+        }
+        
         button {
             width: 100%;
             padding: 15px;
@@ -145,6 +184,12 @@
             input[type="text"], button {
                 font-size: 14px;
             }
+            
+            .correction-level label {
+                min-width: 70px;
+                padding: 10px;
+                font-size: 12px;
+            }
         }
     </style>
 </head>
@@ -157,6 +202,23 @@
             <input type="text" 
                    id="urlInput" 
                    placeholder="https://m.v.qq.com/x/m/play?lid=&cid=mzc00200qwso750&vid=j4101x4hih5&ptag=share_11_11...">
+        </div>
+        
+        <div class="input-group">
+            <label>纠错等级</label>
+            <div class="correction-level">
+                <input type="radio" id="levelL" name="level" value="L">
+                <label for="levelL">L级<br><span class="level-description">7% 容错</span></label>
+                
+                <input type="radio" id="levelM" name="level" value="M" checked>
+                <label for="levelM">M级<br><span class="level-description">15% 容错</span></label>
+                
+                <input type="radio" id="levelQ" name="level" value="Q">
+                <label for="levelQ">Q级<br><span class="level-description">25% 容错</span></label>
+                
+                <input type="radio" id="levelH" name="level" value="H">
+                <label for="levelH">H级<br><span class="level-description">30% 容错</span></label>
+            </div>
         </div>
         
         <button onclick="generateQRCode()">生成二维码</button>
@@ -181,6 +243,9 @@
             const resultDiv = document.getElementById('result');
             const cleanUrlDiv = document.getElementById('cleanUrl');
             const qrcodeDiv = document.getElementById('qrcode');
+            
+            // 获取选中的纠错等级
+            const selectedLevel = document.querySelector('input[name="level"]:checked').value;
             
             // 隐藏之前的结果和错误
             errorDiv.classList.remove('show');
@@ -219,14 +284,14 @@
                 cleanUrlDiv.textContent = cleanUrl;
                 resultDiv.classList.add('show');
                 
-                // 生成二维码
+                // 生成二维码 - 使用选中的纠错等级
                 new QRCode(qrcodeDiv, {
                     text: cleanUrl,
                     width: 200,
                     height: 200,
                     colorDark: "#000000",
                     colorLight: "#ffffff",
-                    correctLevel: QRCode.CorrectLevel.H
+                    correctLevel: QRCode.CorrectLevel[selectedLevel]
                 });
                 
             } catch (e) {
