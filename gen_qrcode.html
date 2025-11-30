@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>腾讯视频链接转二维码</title>
+    <title>视频链接转二维码</title>
     <style>
         * {
             margin: 0;
@@ -144,6 +144,25 @@
             color: #333;
         }
         
+        .platform-tag {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .platform-tag.tencent {
+            background: #ff6b00;
+            color: white;
+        }
+        
+        .platform-tag.iqiyi {
+            background: #00be06;
+            color: white;
+        }
+        
         .qrcode-container {
             text-align: center;
             padding: 20px;
@@ -195,13 +214,13 @@
 </head>
 <body>
     <div class="container">
-        <h1>🎬 腾讯视频链接转二维码</h1>
+        <h1>🎬 视频链接转二维码</h1>
         
         <div class="input-group">
-            <label for="urlInput">请输入腾讯视频链接</label>
+            <label for="urlInput">请输入视频链接（支持腾讯视频、爱奇艺）</label>
             <input type="text" 
                    id="urlInput" 
-                   placeholder="https://m.v.qq.com/x/m/play?lid=&cid=mzc00200qwso750&vid=j4101x4hih5&ptag=share_11_11...">
+                   placeholder="腾讯视频: https://m.v.qq.com/... 或 爱奇艺: http://qy.net/...">
         </div>
         
         <div class="input-group">
@@ -226,7 +245,8 @@
         <div class="error" id="error"></div>
         
         <div class="result" id="result">
-            <h3 style="margin-bottom: 15px; color: #333;">简化后的链接：</h3>
+            <div id="platformTag"></div>
+            <h3 style="margin-bottom: 15px; color: #333;" id="resultTitle">链接：</h3>
             <div class="clean-url" id="cleanUrl"></div>
             
             <div class="qrcode-container">
@@ -243,6 +263,8 @@
             const resultDiv = document.getElementById('result');
             const cleanUrlDiv = document.getElementById('cleanUrl');
             const qrcodeDiv = document.getElementById('qrcode');
+            const platformTagDiv = document.getElementById('platformTag');
+            const resultTitle = document.getElementById('resultTitle');
             
             // 获取选中的纠错等级
             const selectedLevel = document.querySelector('input[name="level"]:checked').value;
@@ -251,6 +273,7 @@
             errorDiv.classList.remove('show');
             resultDiv.classList.remove('show');
             qrcodeDiv.innerHTML = '';
+            platformTagDiv.innerHTML = '';
             
             if (!input) {
                 errorDiv.textContent = '请输入链接';
@@ -260,33 +283,47 @@
             
             try {
                 const url = new URL(input);
+                let finalUrl = input;
+                let platform = '';
                 
-                // 检查是否是腾讯视频链接
-                if (!url.hostname.includes('v.qq.com')) {
-                    errorDiv.textContent = '请输入有效的腾讯视频链接';
+                // 检查是爱奇艺链接
+                if (url.hostname.includes('qy.net') || url.hostname.includes('iqiyi.com')) {
+                    platform = 'iqiyi';
+                    // 爱奇艺链接不做处理，直接使用
+                    finalUrl = input;
+                    platformTagDiv.innerHTML = '<span class="platform-tag iqiyi">爱奇艺</span>';
+                    resultTitle.textContent = '链接：';
+                }
+                // 检查是腾讯视频链接
+                else if (url.hostname.includes('v.qq.com')) {
+                    platform = 'tencent';
+                    // 获取vid参数
+                    const vid = url.searchParams.get('vid');
+                    
+                    if (!vid) {
+                        errorDiv.textContent = '腾讯视频链接中未找到vid参数';
+                        errorDiv.classList.add('show');
+                        return;
+                    }
+                    
+                    // 构建简化的URL
+                    finalUrl = `${url.origin}${url.pathname}?vid=${vid}`;
+                    platformTagDiv.innerHTML = '<span class="platform-tag tencent">腾讯视频</span>';
+                    resultTitle.textContent = '简化后的链接：';
+                }
+                else {
+                    errorDiv.textContent = '请输入有效的腾讯视频或爱奇艺链接';
                     errorDiv.classList.add('show');
                     return;
                 }
-                
-                // 获取vid参数
-                const vid = url.searchParams.get('vid');
-                
-                if (!vid) {
-                    errorDiv.textContent = '链接中未找到vid参数';
-                    errorDiv.classList.add('show');
-                    return;
-                }
-                
-                // 构建新的URL
-                const cleanUrl = `${url.origin}${url.pathname}?vid=${vid}`;
                 
                 // 显示结果
-                cleanUrlDiv.textContent = cleanUrl;
+                cleanUrlDiv.textContent = finalUrl;
                 resultDiv.classList.add('show');
                 
-                // 生成二维码 - 使用选中的纠错等级
+                // 生成二维码
                 new QRCode(qrcodeDiv, {
-                    text: cleanUrl,
+                    text: finalUrl,
                     width: 200,
                     height: 200,
                     colorDark: "#000000",
