@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>高清图片差异对比工具 (修复显示版)</title>
+    <style>
+        :root {
+            --bg-color: #1e1e1e;
+            --panel-bg: #2d2d2d;
+            --text-color: #e0e0e0;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* 顶部栏 */
+        header {
+            background-color: var(--panel-bg);
+            padding: 0 20px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            z-index: 100;
+            flex-shrink: 0;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .btn {
+            position: relative;
+            background-color: #444;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            border: 1px solid #555;
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .btn:hover { background-color: #555; }
+
+        .btn input[type=file] {
+            position: absolute;
+            left: 0; top: 0; width: 100%; height: 100%;
+            opacity: 0; cursor: pointer;
+        }
+
+        .status { font-size: 12px; color: #aaa; max-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* 视口 */
+        #viewport {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background-image: 
+                linear-gradient(45deg, #252525 25%, transparent 25%), 
+                linear-gradient(-45deg, #252525 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #252525 75%), 
+                linear-gradient(-45deg, transparent 75%, #252525 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            cursor: crosshair;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        #viewport.dragging { cursor: grabbing; }
+
+        /* 提示文字 */
+        #placeholder {
+            position: absolute;
+            pointer-events: none;
+            color: #666;
+            font-size: 1.5rem;
+            z-index: 0;
+        }
+
+        /* 舞台：核心容器 */
+        #stage {
+            position: absolute;
+            top: 0; left: 0;
+            transform-origin: 0 0;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+            display: none; /* 初始隐藏，加载后通过JS改为block */
+        }
+
+        /* 图层 */
+        .layer {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            overflow: hidden;
+        }
+
+        .layer img {
+            display: block;
+            width: 100%; 
+            height: 100%;
+            object-fit: fill; /* 强制填满容器，由舞台尺寸控制比例 */
+            pointer-events: none;
+            -webkit-user-drag: none;
+        }
+
+        /* 右侧图（底层） */
+        #layer-modified { z-index: 1; background: #1e1e1e; }
+
+        /* 左侧图（顶层，被裁剪） */
+        #layer-original { 
+            z-index: 2; 
+            width: 50%; /* 初始一半 */
+            border-right: 1px solid rgba(255,255,255,0.8);
+            background: #1e1e1e;
+        }
+
+        /* 
+           关键修复：
+           左侧图虽然容器宽度变小了，但里面的图片必须保持舞台的总宽度。
+           这样才能保证两张图是重叠的，而不是被压缩。
+        */
+        #layer-original img {
+            width: auto; /* 先设为自动，JS会强制覆盖为舞台宽度 */
+            height: 100%;
+            max-width: none; /* 防止CSS框架干扰 */
+        }
+
+        /* 标签 */
+        .label {
+            position: absolute;
+            top: 10px;
+            padding: 4px 8px;
+            background: rgba(0,0,0,0.6);
+            color: #fff;
+            font-size: 12px;
+            border-radius: 4px;
+            pointer-events: none;
+        }
+        .label-l { left: 10px; }
+        .label-r { right: 10px; }
+
+        /* 分割线手柄 */
+        .handle {
+            position: absolute;
+            top: 0; bottom: 0; left: 50%;
+            width: 0; z-index: 10; pointer-events: none;
+        }
+        .handle-icon {
+            position: absolute;
+            bottom: 30px; left: -16px;
+            width: 32px; height: 32px;
+            background: white;
+            border-radius: 50%;
+            color: #333;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <div style="font-weight:bold;">图片对比工具 (Fix)</div>
+    <div class="controls">
+        <div class="btn">
+            <span>📁 原图 (左)</span>
+            <input type="file" id="fileOrig" accept="image/*">
+        </div>
+        <span id="statOrig" class="status">未选择</span>
+
+        <div class="btn">
+            <span>📁 处理后 (右)</span>
+            <input type="file" id="fileMod" accept="image/*">
+        </div>
+        <span id="statMod" class="status">未选择</span>
+
+        <button class="btn" onclick="resetView()">⟲ 复位</button>
+    </div>
+</header>
+
+<div id="viewport">
+    <div id="placeholder">请上传图片...</div>
+    
+    <div id="stage">
+        <!-- 底层：Modified -->
+        <div id="layer-modified" class="layer">
+            <img id="imgMod" src="" alt="">
+            <span class="label label-r">处理后</span>
+        </div>
+
+        <!-- 顶层：Original (被裁剪) -->
+        <div id="layer-original" class="layer">
+            <img id="imgOrig" src="" alt="">
+            <span class="label label-l">原图</span>
+        </div>
+
+        <div class="handle" id="handle">
+            <div class="handle-icon">↔</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 状态管理
+    const state = {
+        scale: 1,
+        x: 0, y: 0,       // 舞台偏移量
+        isDragging: false,
+        dragStartX: 0, dragStartY: 0,
+        width: 0, height: 0
+    };
+
+    const els = {
+        viewport: document.getElementById('viewport'),
+        stage: document.getElementById('stage'),
+        layerOrig: document.getElementById('layer-original'),
+        imgOrig: document.getElementById('imgOrig'),
+        imgMod: document.getElementById('imgMod'),
+        handle: document.getElementById('handle'),
+        placeholder: document.getElementById('placeholder')
+    };
+
+    // 1. 图片上传逻辑
+    function setupUpload(inputId, imgEl, statId) {
+        document.getElementById(inputId).addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(!file) return;
+
+            document.getElementById(statId).textContent = file.name;
+            
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                imgEl.src = evt.target.result;
+                // 图片加载完成后触发
+                imgEl.onload = () => {
+                    onImageLoaded(imgEl);
+                };
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    setupUpload('fileOrig', els.imgOrig, 'statOrig');
+    setupUpload('fileMod', els.imgMod, 'statMod');
+
+    // 图片加载回调
+    function onImageLoaded(img) {
+        // 只要有一张图加载，就显示舞台
+        els.stage.style.display = 'block';
+        els.placeholder.style.display = 'none';
+
+        // 更新舞台尺寸：以当前加载的这张图为准（假设两张图大小一致）
+        // 如果之前没有设置过尺寸，或者想强制以最新上传的图为准
+        if (state.width === 0 || img.naturalWidth > 0) {
+            state.width = img.naturalWidth;
+            state.height = img.naturalHeight;
+            
+            // 设置舞台物理尺寸
+            els.stage.style.width = state.width + 'px';
+            els.stage.style.height = state.height + 'px';
+
+            // 关键：强制左侧原图的 img 宽度等于舞台宽度
+            // 否则当 layer-original 宽度为 50% 时，图片也会被挤压
+            els.imgOrig.style.width = state.width + 'px';
+            
+            // 第一次加载时，自动复位视图
+            resetView();
+        }
+    }
+
+    // 2. 视图控制 (缩放/平移)
+    function updateTransform() {
+        els.stage.style.transform = `translate(${state.x}px, ${state.y}px) scale(${state.scale})`;
+    }
+
+    window.resetView = function() {
+        if (state.width === 0) return;
+        
+        const vw = els.viewport.clientWidth;
+        const vh = els.viewport.clientHeight;
+
+        // 计算适应屏幕的比例 (留出 40px 边距)
+        const scale = Math.min(
+            (vw - 40) / state.width,
+            (vh - 40) / state.height
+        );
+        
+        state.scale = scale > 0 ? scale : 1; // 防止除以0等错误
+        
+        // 居中
+        state.x = (vw - state.width * state.scale) / 2;
+        state.y = (vh - state.height * state.scale) / 2;
+
+        updateTransform();
+    };
+
+    // 3. 鼠标交互
+    
+    // 滚轮缩放
+    els.viewport.addEventListener('wheel', (e) => {
+        if (state.width === 0) return;
+        e.preventDefault();
+
+        const zoomIntensity = 0.1;
+        const delta = e.deltaY > 0 ? -1 : 1;
+        const newScale = state.scale * (1 + delta * zoomIntensity);
+
+        // 限制缩放范围
+        if (newScale < 0.05 || newScale > 50) return;
+
+        // 计算鼠标相对于舞台左上角的坐标 (未缩放前)
+        const mouseX = (e.clientX - state.x) / state.scale;
+        const mouseY = (e.clientY - state.y) / state.scale;
+
+        // 更新缩放
+        state.scale = newScale;
+
+        // 修正位置，使缩放中心为鼠标位置
+        state.x = e.clientX - mouseX * state.scale;
+        state.y = e.clientY - mouseY * state.scale;
+
+        updateTransform();
+    }, { passive: false });
+
+    // 鼠标按下：开始拖拽
+    els.viewport.addEventListener('mousedown', (e) => {
+        if (state.width === 0) return;
+        if (e.button === 0) { // 左键
+            state.isDragging = true;
+            state.dragStartX = e.clientX - state.x;
+            state.dragStartY = e.clientY - state.y;
+            els.viewport.classList.add('dragging');
+        }
+    });
+
+    // 鼠标松开
+    window.addEventListener('mouseup', () => {
+        state.isDragging = false;
+        els.viewport.classList.remove('dragging');
+    });
+
+    // 鼠标移动
+    window.addEventListener('mousemove', (e) => {
+        if (state.width === 0) return;
+
+        if (state.isDragging) {
+            // --- 拖拽模式 ---
+            e.preventDefault();
+            state.x = e.clientX - state.dragStartX;
+            state.y = e.clientY - state.dragStartY;
+            updateTransform();
+        } else {
+            // --- 对比模式 (移动分割线) ---
+            // 获取舞台在屏幕上的实际位置矩形
+            const rect = els.stage.getBoundingClientRect();
+            
+            // 鼠标在图片上的 X 坐标 (相对于图片左边缘)
+            let relativeX = e.clientX - rect.left;
+            
+            // 转换为百分比
+            let percent = (relativeX / rect.width) * 100;
+            
+            // 限制 0-100%
+            percent = Math.max(0, Math.min(100, percent));
+
+            els.layerOrig.style.width = percent + '%';
+            els.handle.style.left = percent + '%';
+        }
+    });
+
+    // 窗口大小改变时自适应
+    window.addEventListener('resize', () => {
+        // 可选：如果希望窗口变化时自动居中，可取消下面注释
+        // resetView();
+    });
+
+</script>
+</body>
+</html>
