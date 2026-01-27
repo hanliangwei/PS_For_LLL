@@ -2,7 +2,9 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>高清图片差异对比工具 (修复显示版)</title>
+    <title>高清图片差异对比工具 (TIFF支持版)</title>
+    <!-- 引入 UTIF.js 用于解析 TIFF 文件 -->
+    <script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.js"></script>
     <style>
         :root {
             --bg-color: #1e1e1e;
@@ -20,6 +22,11 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            /* 修复2：全局禁止文本选中，防止拖动变蓝 */
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
         }
 
         /* 顶部栏 */
@@ -81,6 +88,8 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            /* 修复2：确保视口区域不可选中 */
+            user-select: none; 
         }
         
         #viewport.dragging { cursor: grabbing; }
@@ -100,7 +109,7 @@
             top: 0; left: 0;
             transform-origin: 0 0;
             box-shadow: 0 0 30px rgba(0,0,0,0.5);
-            display: none; /* 初始隐藏，加载后通过JS改为block */
+            display: none; 
         }
 
         /* 图层 */
@@ -115,9 +124,9 @@
             display: block;
             width: 100%; 
             height: 100%;
-            object-fit: fill; /* 强制填满容器，由舞台尺寸控制比例 */
+            object-fit: fill; 
             pointer-events: none;
-            -webkit-user-drag: none;
+            -webkit-user-drag: none; /* 防止图片被拖拽出浏览器 */
         }
 
         /* 右侧图（底层） */
@@ -126,20 +135,15 @@
         /* 左侧图（顶层，被裁剪） */
         #layer-original { 
             z-index: 2; 
-            width: 50%; /* 初始一半 */
+            width: 50%; 
             border-right: 1px solid rgba(255,255,255,0.8);
             background: #1e1e1e;
         }
 
-        /* 
-           关键修复：
-           左侧图虽然容器宽度变小了，但里面的图片必须保持舞台的总宽度。
-           这样才能保证两张图是重叠的，而不是被压缩。
-        */
         #layer-original img {
-            width: auto; /* 先设为自动，JS会强制覆盖为舞台宽度 */
+            width: auto; 
             height: 100%;
-            max-width: none; /* 防止CSS框架干扰 */
+            max-width: none; 
         }
 
         /* 标签 */
@@ -180,17 +184,18 @@
 <body>
 
 <header>
-    <div style="font-weight:bold;">图片对比工具 (Fix)</div>
+    <div style="font-weight:bold;">图片对比工具 (TIFF+)</div>
     <div class="controls">
         <div class="btn">
             <span>📁 原图 (左)</span>
-            <input type="file" id="fileOrig" accept="image/*">
+            <!-- 修复1：accept 增加 .tif, .tiff -->
+            <input type="file" id="fileOrig" accept="image/*,.tif,.tiff">
         </div>
         <span id="statOrig" class="status">未选择</span>
 
         <div class="btn">
             <span>📁 处理后 (右)</span>
-            <input type="file" id="fileMod" accept="image/*">
+            <input type="file" id="fileMod" accept="image/*,.tif,.tiff">
         </div>
         <span id="statMod" class="status">未选择</span>
 
@@ -199,7 +204,7 @@
 </header>
 
 <div id="viewport">
-    <div id="placeholder">请上传图片...</div>
+    <div id="placeholder">请上传图片 (支持 JPG/PNG/TIFF)...</div>
     
     <div id="stage">
         <!-- 底层：Modified -->
@@ -240,24 +245,74 @@
         placeholder: document.getElementById('placeholder')
     };
 
-    // 1. 图片上传逻辑
+    // 1. 图片上传逻辑 (包含 TIFF 支持和重复上传修复)
     function setupUpload(inputId, imgEl, statId) {
-        document.getElementById(inputId).addEventListener('change', (e) => {
+        const inputEl = document.getElementById(inputId);
+        const statEl = document.getElementById(statId);
+
+        inputEl.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if(!file) return;
 
-            document.getElementById(statId).textContent = file.name;
+            // 修复3：清空 input 值，允许重复选择同一文件触发 change 事件
+            e.target.value = '';
+
+            statEl.textContent = "加载中...";
             
-            const reader = new FileReader();
-            reader.onload = (evt) => {
-                imgEl.src = evt.target.result;
-                // 图片加载完成后触发
-                imgEl.onload = () => {
-                    onImageLoaded(imgEl);
+            const fileName = file.name.toLowerCase();
+            const isTiff = fileName.endsWith('.tif') || fileName.endsWith('.tiff');
+
+            if (isTiff) {
+                // 修复1：TIFF 处理逻辑
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    try {
+                        const buffer = evt.target.result;
+                        const ifds = UTIF.decode(buffer);
+                        // 通常取第一页
+                        const page = ifds[0]; 
+                        UTIF.decodeImage(buffer, page);
+                        const rgba = UTIF.toRGBA8(page);
+
+                        // 创建临时 Canvas 转换数据
+                        const canvas = document.createElement('canvas');
+                        canvas.width = page.width;
+                        canvas.height = page.height;
+                        const ctx = canvas.getContext('2d');
+                        const imgData = ctx.createImageData(page.width, page.height);
+                        
+                        // 将 Uint8Array 复制到 Uint8ClampedArray
+                        for (let i = 0; i < rgba.length; i++) {
+                            imgData.data[i] = rgba[i];
+                        }
+                        
+                        ctx.putImageData(imgData, 0, 0);
+                        
+                        // 转换为浏览器可读的 URL
+                        imgEl.src = canvas.toDataURL();
+                        statEl.textContent = file.name;
+                    } catch (err) {
+                        console.error(err);
+                        statEl.textContent = "TIFF 解析失败";
+                        alert("TIFF 文件解析失败，请确保文件未损坏。");
+                    }
                 };
-            };
-            reader.readAsDataURL(file);
+                reader.readAsArrayBuffer(file);
+            } else {
+                // 普通图片处理
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    imgEl.src = evt.target.result;
+                    statEl.textContent = file.name;
+                };
+                reader.readAsDataURL(file);
+            }
         });
+
+        // 绑定 onload 事件，无论是 TIFF 转换后还是普通图片加载后都会触发
+        imgEl.onload = () => {
+            onImageLoaded(imgEl);
+        };
     }
 
     setupUpload('fileOrig', els.imgOrig, 'statOrig');
@@ -265,12 +320,10 @@
 
     // 图片加载回调
     function onImageLoaded(img) {
-        // 只要有一张图加载，就显示舞台
         els.stage.style.display = 'block';
         els.placeholder.style.display = 'none';
 
-        // 更新舞台尺寸：以当前加载的这张图为准（假设两张图大小一致）
-        // 如果之前没有设置过尺寸，或者想强制以最新上传的图为准
+        // 更新舞台尺寸：以当前加载的这张图为准
         if (state.width === 0 || img.naturalWidth > 0) {
             state.width = img.naturalWidth;
             state.height = img.naturalHeight;
@@ -279,8 +332,7 @@
             els.stage.style.width = state.width + 'px';
             els.stage.style.height = state.height + 'px';
 
-            // 关键：强制左侧原图的 img 宽度等于舞台宽度
-            // 否则当 layer-original 宽度为 50% 时，图片也会被挤压
+            // 强制左侧原图的 img 宽度等于舞台宽度
             els.imgOrig.style.width = state.width + 'px';
             
             // 第一次加载时，自动复位视图
@@ -299,15 +351,12 @@
         const vw = els.viewport.clientWidth;
         const vh = els.viewport.clientHeight;
 
-        // 计算适应屏幕的比例 (留出 40px 边距)
         const scale = Math.min(
             (vw - 40) / state.width,
             (vh - 40) / state.height
         );
         
-        state.scale = scale > 0 ? scale : 1; // 防止除以0等错误
-        
-        // 居中
+        state.scale = scale > 0 ? scale : 1;
         state.x = (vw - state.width * state.scale) / 2;
         state.y = (vh - state.height * state.scale) / 2;
 
@@ -325,17 +374,12 @@
         const delta = e.deltaY > 0 ? -1 : 1;
         const newScale = state.scale * (1 + delta * zoomIntensity);
 
-        // 限制缩放范围
         if (newScale < 0.05 || newScale > 50) return;
 
-        // 计算鼠标相对于舞台左上角的坐标 (未缩放前)
         const mouseX = (e.clientX - state.x) / state.scale;
         const mouseY = (e.clientY - state.y) / state.scale;
 
-        // 更新缩放
         state.scale = newScale;
-
-        // 修正位置，使缩放中心为鼠标位置
         state.x = e.clientX - mouseX * state.scale;
         state.y = e.clientY - mouseY * state.scale;
 
@@ -350,6 +394,8 @@
             state.dragStartX = e.clientX - state.x;
             state.dragStartY = e.clientY - state.y;
             els.viewport.classList.add('dragging');
+            // 修复2：防止默认行为（如选中）
+            e.preventDefault();
         }
     });
 
@@ -371,16 +417,9 @@
             updateTransform();
         } else {
             // --- 对比模式 (移动分割线) ---
-            // 获取舞台在屏幕上的实际位置矩形
             const rect = els.stage.getBoundingClientRect();
-            
-            // 鼠标在图片上的 X 坐标 (相对于图片左边缘)
             let relativeX = e.clientX - rect.left;
-            
-            // 转换为百分比
             let percent = (relativeX / rect.width) * 100;
-            
-            // 限制 0-100%
             percent = Math.max(0, Math.min(100, percent));
 
             els.layerOrig.style.width = percent + '%';
@@ -388,10 +427,8 @@
         }
     });
 
-    // 窗口大小改变时自适应
     window.addEventListener('resize', () => {
-        // 可选：如果希望窗口变化时自动居中，可取消下面注释
-        // resetView();
+        // 可选：resetView();
     });
 
 </script>
