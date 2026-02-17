@@ -1,133 +1,497 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>励志弹幕</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>计算器</title>
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            background-image: url('http://img.netbian.com/file/2024/0306/171556BZqcz.jpg');
-            background-size: cover;
-            background-position: center;
-            overflow: hidden;
-            font-family: 'Microsoft YaHei', Arial, sans-serif;
-        }
-        
-        #container {
-            position: relative;
-            width: 100%;
-            height: 100%;
-        }
-        
-        .barrage {
-            position: absolute;
-            white-space: nowrap;
-            padding: 8px 16px;
-            border-radius: 20px;
-            color: white;
-            font-weight: bold;
-            font-size: 16px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
-            opacity: 0.9;
+        * {
+            box-sizing: border-box;
+            font-family: 'Helvetica Neue', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
             user-select: none;
-            animation-duration: var(--duration);
-            animation-name: move;
-            animation-timing-function: linear;
-            animation-fill-mode: forwards;
         }
-        
-        @keyframes move {
-            from {
-                transform: translateX(100vw);
-            }
-            to {
-                transform: translateX(-100%);
-            }
+        body {
+            background: linear-gradient(145deg, #2b2d3a 0%, #1e1f2b 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            padding: 16px;
+        }
+        .calculator {
+            width: 340px;
+            background: #1c1c1e;
+            border-radius: 40px;
+            padding: 22px 16px 26px 16px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.6), inset 0 1px 2px rgba(255,255,255,0.08);
+            backdrop-filter: blur(10px);
+            border: 1px solid #3a3a3c;
+        }
+        .target-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 18px;
+            align-items: center;
+            background: #2c2c2e;
+            border-radius: 30px;
+            padding: 8px 12px;
+            border: 1px solid #4a4a4c;
+        }
+        .target-input {
+            flex: 1;
+            background: #3a3a3c;
+            border: none;
+            border-radius: 30px;
+            padding: 12px 16px;
+            font-size: 18px;
+            color: white;
+            outline: none;
+            font-family: 'SF Mono', monospace;
+            border: 1px solid #5a5a5e;
+        }
+        .target-input::placeholder {
+            color: #8e8e93;
+        }
+        .target-btn {
+            background: #f1a33c;
+            border: none;
+            border-radius: 30px;
+            padding: 12px 18px;
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+            cursor: pointer;
+            box-shadow: 0 3px 0 #b16f1a;
+            border: 1px solid #ffb96a;
+            transition: 0.05s linear;
+            white-space: nowrap;
+        }
+        .target-btn:active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 #b16f1a;
+        }
+        .display {
+            background: #2c2c2e;
+            border-radius: 24px;
+            padding: 20px 22px;
+            margin-bottom: 22px;
+            text-align: right;
+            font-size: 56px;
+            font-weight: 300;
+            color: #ffffff;
+            letter-spacing: 1px;
+            line-height: 1.2;
+            word-wrap: break-word;
+            word-break: break-all;
+            min-height: 120px;
+            box-shadow: inset 0 4px 10px rgba(0,0,0,0.6);
+            border: 1px solid #4a4a4c;
+            font-family: 'SF Mono', 'Courier New', monospace;
+        }
+        .buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+        button {
+            background: #3a3a3c;
+            border: none;
+            border-radius: 999px;
+            padding: 18px 0;
+            font-size: 30px;
+            font-weight: 400;
+            color: white;
+            cursor: pointer;
+            transition: all 0.1s ease;
+            box-shadow: 0 5px 0 #1d1d1f, 0 8px 12px rgba(0,0,0,0.4);
+            border: 1px solid #5a5a5e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'SF Pro', 'Helvetica Neue', sans-serif;
+        }
+        button:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #1d1d1f, 0 5px 8px rgba(0,0,0,0.4);
+            background: #4a4a4e;
+        }
+        .digit {
+            background: #505054;
+            border-color: #7a7a80;
+        }
+        .digit:active {
+            background: #6a6a70;
+        }
+        #add, #equal {
+            background: #f1a33c;
+            color: white;
+            border-color: #ffb96a;
+            font-size: 36px;
+        }
+        #add:active, #equal:active {
+            background: #ffb45c;
+        }
+        #clear {
+            background: #3a3a3c;
+            font-size: 32px;
+            font-weight: 500;
+        }
+        .placeholder {
+            background: transparent;
+            box-shadow: none;
+            border: 1px dashed #4a4a4e;
+            pointer-events: none;
+            opacity: 0.3;
+            transform: none;
+        }
+        .placeholder:active {
+            transform: none;
+            box-shadow: none;
+            background: transparent;
+        }
+        button:disabled {
+            opacity: 0.3;
+            pointer-events: none;
+            box-shadow: none;
+            transform: none;
         }
     </style>
 </head>
 <body>
-    <div id="container"></div>
+<div class="calculator">
+    <!-- 目标输入行（初始显示，设置成功后隐藏） -->
+    <div class="target-row" id="targetRow">
+        <input type="number" id="targetInput" class="target-input" placeholder="魔术目标" value="2162227" step="1" min="1">
+        <button id="setTargetBtn" class="target-btn">设置</button>
+    </div>
 
-    <script>
-        const container = document.getElementById('container');
-        const motivationalTexts = [
-            '天道酬勤', '自强不息', '厚德载物', '志存高远', '勇往直前',
-            '百折不挠', '滴水穿石', '破釜沉舟', '卧薪尝胆', '自强不息',
-            '厚德载物', '知行合一', '学而时习之', '温故而知新', '学而不厌',
-            '诲人不倦', '发愤忘食', '乐以忘忧', '直面挑战', '永不言败',
-            '越挫越勇', '坚持不懈', '持之以恒', '水滴石穿', '铁杵成针',
-            '积少成多', '聚沙成塔', '千里之行', '始于足下', '山重水复',
-            '柳暗花明', '宝剑锋从', '磨砺出', '梅花香自', '苦寒来',
-            '书山有路', '勤为径', '学海无涯', '苦作舟', '业精于勤',
-            '荒于嬉', '行成于思', '毁于随', '天行健', '君子以自强不息',
-            '地势坤', '君子以厚德载物', '路漫漫其修远兮', '吾将上下而求索',
-            '山不厌高', '海不厌深', '周公吐哺', '天下归心', '老骥伏枥',
-            '志在千里', '烈士暮年', '壮心不已', '穷且益坚', '不坠青云之志',
-            '长风破浪', '会有时', '直挂云帆', '济沧海', '会当凌绝顶',
-            '一览众山小', '宝剑锋从磨砺出', '梅花香自苦寒来', '世上无难事',
-            '只要肯登攀', '千磨万击还坚劲', '任尔东西南北风', '山重水复疑无路',
-            '柳暗花明又一村', '问渠那得清如许', '为有源头活水来', '纸上得来终觉浅',
-            '绝知此事要躬行', '莫愁前路无知己', '天下谁人不识君', '海内存知己',
-            '天涯若比邻', '劝君更尽一杯酒', '西出阳关无故人', '桃花潭水深千尺',
-            '不及汪伦送我情', '春风又绿江南岸', '明月何时照我还', '但愿人长久',
-            '千里共婵娟', '大江东去', '浪淘尽', '千古风流人物', '江山如此多娇',
-            '引无数英雄竞折腰', '数风流人物', '还看今朝', '恰同学少年',
-            '风华正茂', '书生意气', '挥斥方遒', '指点江山', '激扬文字',
-            '粪土当年万户侯', '雄关漫道真如铁', '而今迈步从头越', '红军不怕远征难',
-            '万水千山只等闲', '不到长城非好汉', '屈指行程二万', '宜将剩勇追穷寇',
-            '不可沽名学霸王', '天若有情天亦老', '人间正道是沧桑', '红雨随心翻作浪',
-            '青山着意化为桥', '一万年太久', '只争朝夕', '牢骚太盛防肠断',
-            '风物长宜放眼量', '踏遍青山人未老', '风景这边独好', '天生我材必有用',
-            '千金散尽还复来', '长风破浪会有时', '直挂云帆济沧海', '会当凌绝顶',
-            '一览众山小', '宝剑锋从磨砺出', '梅花香自苦寒来', '书山有路勤为径',
-            '学海无涯苦作舟', '业精于勤荒于嬉', '行成于思毁于随', '天道酬勤',
-            '自强不息', '厚德载物', '志存高远', '勇往直前', '百折不挠',
-            '滴水穿石', '破釜沉舟', '卧薪尝胆', '知行合一', '学而时习之',
-            '温故而知新', '学而不厌', '诲人不倦', '发愤忘食', '乐以忘忧',
-            '直面挑战', '永不言败', '越挫越勇', '坚持不懈', '持之以恒'
-        ];
-        
-        const colors = [
-            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
-            '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
-            '#F8C471', '#82E0AA', '#F1948A', '#85C1E9', '#D7BDE2'
-        ];
-        
-        function createBarrage() {
-            const text = motivationalTexts[Math.floor(Math.random() * motivationalTexts.length)];
-            const color = colors[Math.floor(Math.random() * colors.length)];
-            
-            const barrage = document.createElement('div');
-            barrage.className = 'barrage';
-            barrage.textContent = text;
-            barrage.style.color = color;
-            barrage.style.fontSize = (Math.random() * 12 + 16) + 'px';
-            barrage.style.top = Math.random() * 100 + 'vh';
-            barrage.style.animationDuration = (Math.random() * 10 + 10) + 's';
-            barrage.style.opacity = Math.random() * 0.5 + 0.5;
-            
-            container.appendChild(barrage);
-            
-            // 移除弹幕
-            setTimeout(() => {
-                if (barrage.parentNode) {
-                    barrage.parentNode.removeChild(barrage);
+    <div class="display" id="display">0</div>
+    <div class="buttons">
+        <!-- 第一行 -->
+        <button class="digit">7</button>
+        <button class="digit">8</button>
+        <button class="digit">9</button>
+        <button id="add">+</button>
+
+        <!-- 第二行 -->
+        <button class="digit">4</button>
+        <button class="digit">5</button>
+        <button class="digit">6</button>
+        <button id="equal">=</button>
+
+        <!-- 第三行 -->
+        <button class="digit">1</button>
+        <button class="digit">2</button>
+        <button class="digit">3</button>
+        <button id="clear">C</button>
+
+        <!-- 第四行：0 + 三个占位符（保持布局，不可用） -->
+        <button class="digit" data-zero>0</button>
+        <button class="placeholder" disabled></button>
+        <button class="placeholder" disabled></button>
+        <button class="placeholder" disabled></button>
+    </div>
+</div>
+
+<script>
+    (function() {
+        // ----- DOM 元素 -----
+        const displayEl = document.getElementById('display');
+        const targetInput = document.getElementById('targetInput');
+        const setTargetBtn = document.getElementById('setTargetBtn');
+        const targetRow = document.getElementById('targetRow');
+
+        // ----- 可变目标值 (初始从input读取) -----
+        let TARGET = 2162227; // 默认，稍后同步
+
+        // 同步初始值
+        function updateTargetFromInput() {
+            const raw = targetInput.value.trim();
+            if (raw === '') return false;
+            const parsed = Number(raw);
+            if (!isNaN(parsed) && Number.isInteger(parsed) && parsed > 0) {
+                TARGET = parsed;
+                return true;
+            } else {
+                alert('请输入一个正整数');
+                targetInput.value = TARGET; // 恢复上次有效值
+                return false;
+            }
+        }
+
+        // 初始化：从input设置TARGET
+        (function initTarget() {
+            const initialVal = targetInput.value;
+            const parsed = Number(initialVal);
+            if (!isNaN(parsed) && Number.isInteger(parsed) && parsed > 0) {
+                TARGET = parsed;
+            } else {
+                TARGET = 2162227;
+                targetInput.value = TARGET;
+            }
+        })();
+
+        // 设置按钮点击事件
+        setTargetBtn.addEventListener('click', function() {
+            if (updateTargetFromInput()) {
+                // 目标有效，隐藏输入行
+                targetRow.style.display = 'none';
+                // 重置计算器状态 (避免旧的魔术数据混乱)
+                fullReset();
+            }
+        });
+
+        // 输入框支持回车确认
+        targetInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                setTargetBtn.click();
+            }
+        });
+
+        // ----- 状态变量 (常规计算器) -----
+        let currentInput = '0';                // 当前显示的数字（字符串）
+        let firstOperand = null;                // 第一个操作数（数字）
+        let operator = null;                    // 当前运算符 '+'
+        let waitingForSecond = false;            // 是否正在等待第二个操作数（刚按过运算符）
+
+        // ----- 魔术相关状态 -----
+        let magicReady = false;                  // 第一次加法完成，准备好魔术 (存储了 magicSum 和 magicA)
+        let magicSum = null;                      // 第一次加法的结果 S
+        let magicA = null;                        // TARGET - S  (目标魔术数字)
+        let magicDigits = [];                      // magicA 的每一位字符数组，例如 ['1','2','3','4','5']
+        let magicActive = false;                   // 是否处于魔术输入模式（按过+并且magicReady）
+        let magicIndex = 0;                         // 下一个要显示的魔术数字的索引
+        let firstMagicDigit = true;                 // 魔术输入模式下，是否是第一个数字（需要覆盖显示）
+
+        // ----- 辅助函数：更新显示屏 -----
+        function updateDisplay() {
+            displayEl.innerText = currentInput;
+        }
+
+        // ----- 重置所有（C键也会调用，同时目标保留）-----
+        function fullReset() {
+            currentInput = '0';
+            firstOperand = null;
+            operator = null;
+            waitingForSecond = false;
+            magicReady = false;
+            magicActive = false;
+            magicSum = null;
+            magicA = null;
+            magicDigits = [];
+            magicIndex = 0;
+            firstMagicDigit = true;
+            updateDisplay();
+        }
+
+        // ----- 执行常规计算 (仅支持加法) -----
+        function compute() {
+            if (firstOperand === null || operator !== '+') return; // 防御
+
+            const second = parseFloat(currentInput);
+            // 避免 NaN
+            if (isNaN(second)) return;
+
+            let result;
+            if (operator === '+') {
+                result = firstOperand + second;
+            } else {
+                return; // 其他运算符未实现，忽略
+            }
+
+            // 将结果转为字符串（整数显示无小数点）
+            currentInput = Number.isInteger(result) ? result.toString() : result.toFixed(2);
+            updateDisplay();
+
+            // 关键：如果是加法，准备魔术数据 (只有加法才会激活魔术预备)
+            if (operator === '+') {
+                magicSum = result;
+                // 计算 a = TARGET - S
+                const a = TARGET - magicSum;
+                // 魔术要求 a 为正整数（且有限），否则不开启魔术预备
+                if (Number.isInteger(a) && a > 0 && isFinite(a)) {
+                    magicReady = true;
+                    magicA = a;
+                    magicDigits = a.toString().split('');  // 例如 12345 -> ['1','2','3','4','5']
+                } else {
+                    magicReady = false;   // a 为负数、0、小数等，不触发魔术
+                    magicA = null;
+                    magicDigits = [];
                 }
-            }, 20000);
+            } else {
+                // 非加法运算，清除魔术预备
+                magicReady = false;
+                magicA = null;
+                magicDigits = [];
+            }
+
+            // 计算结束，清空运算符和操作数，回到初始状态 (但保留显示结果)
+            firstOperand = null;
+            operator = null;
+            waitingForSecond = false;
         }
-        
-        // 持续创建弹幕
-        setInterval(createBarrage, 300);
-        
-        // 初始创建一些弹幕
-        for (let i = 0; i < 20; i++) {
-            setTimeout(createBarrage, i * 200);
+
+        // ----- 处理数字输入 -----
+        function inputDigit(digit) {
+            // 魔术模式下 且 魔术激活
+            if (magicActive) {
+                // 只有还没输完所有位才响应
+                if (magicIndex < magicDigits.length) {
+                    const magicChar = magicDigits[magicIndex];   // 当前应该显示的数字（字符）
+                    if (firstMagicDigit) {
+                        // 第一个数字：直接替换当前显示 (不管之前显示的是什么)
+                        currentInput = magicChar;
+                        firstMagicDigit = false;
+                    } else {
+                        // 后续数字：追加
+                        currentInput += magicChar;
+                    }
+                    magicIndex++;
+                    updateDisplay();
+                } else {
+                    // 魔术数字已经全部显示完毕，再按数字无效 (直接忽略)
+                    return;
+                }
+                return; // 魔术模式下数字处理完毕，不再执行常规逻辑
+            }
+
+            // ---------- 正常计算器数字输入 ----------
+            // 如果之前有魔术预备但还没进入魔术模式，现在用户直接按数字 → 清除魔术预备，开始全新输入
+            if (magicReady && !magicActive) {
+                magicReady = false;
+                magicA = null;
+                magicDigits = [];
+            }
+
+            if (waitingForSecond) {
+                // 刚按过运算符，新数字应该替换当前显示
+                currentInput = digit;
+                waitingForSecond = false;
+            } else {
+                // 正常累加，但避免前导零过多（如果当前是"0"，则替换为数字）
+                if (currentInput === '0') {
+                    currentInput = digit;
+                } else {
+                    currentInput += digit;
+                }
+            }
+            updateDisplay();
         }
-    </script>
+
+        // ----- 处理运算符 (目前只有 '+') -----
+        function handleOperator(op) {
+            // 魔术模式下，任何运算符（包括+）都忽略，防止退出魔术输入
+            if (magicActive) {
+                return;
+            }
+
+            // 正常模式 (或魔术预备但未激活)
+            if (op === '+') {
+                // 特殊情况：魔术预备状态 (magicReady = true) 且 按加号 → 进入魔术输入模式
+                if (magicReady) {
+                    // 进入魔术模式
+                    magicActive = true;
+                    magicIndex = 0;
+                    firstMagicDigit = true;
+                    // 保留 firstOperand 为 magicSum (后续等号直接使用 magicSum 变量，但这里也存一下方便)
+                    firstOperand = magicSum;   // 仅用于可能的展示，但魔术等号不依赖它，使用专门的 magicSum
+                    // 注意：常规运算符状态需要清除，避免干扰
+                    operator = null;
+                    waitingForSecond = false;  // 魔术输入不遵循常规等待
+                    // 当前显示不变（仍显示上一次的和），等待第一个数字覆盖
+                    return;
+                }
+
+                // 常规加法逻辑 (无魔术预备)
+                // 如果已经有运算符且不处于等待第二数，先计算前一次运算
+                if (firstOperand !== null && operator && !waitingForSecond) {
+                    compute();   // 计算后 firstOperand, operator 会被置空，currentInput 为结果
+                }
+                // 将当前显示值设为第一个操作数
+                firstOperand = parseFloat(currentInput);
+                operator = '+';
+                waitingForSecond = true;
+                // 显示不变，等待输入数字
+            }
+            // 其他运算符未实现，忽略
+        }
+
+        // ----- 处理等号 -----
+        function handleEqual() {
+            // 魔术模式下等号
+            if (magicActive) {
+                // 必须已经完整输入所有魔术数字
+                if (magicIndex === magicDigits.length) {
+                    // 此时 currentInput 应该是 magicA 的字符串
+                    const magicNumber = parseInt(currentInput, 10);
+                    // 最终结果 = 之前保存的和 + magicA = TARGET
+                    const finalResult = magicSum + magicNumber;  // 理应等于 TARGET
+                    currentInput = finalResult.toString();
+                    // 退出所有魔术状态，回到常规
+                    magicActive = false;
+                    magicReady = false;
+                    magicSum = null;
+                    magicA = null;
+                    magicDigits = [];
+                    firstOperand = null;
+                    operator = null;
+                    waitingForSecond = false;
+                    updateDisplay();
+                } else {
+                    // 没输完魔术数字，等号无效 (什么也不做)
+                }
+                return;
+            }
+
+            // 常规等号
+            if (firstOperand !== null && operator && !waitingForSecond) {
+                compute();   // compute 里已经处理魔术预备
+            }
+            // 如果条件不满足，按等号无反应 (符合一般计算器)
+        }
+
+        // ----- 事件绑定 -----
+        document.querySelectorAll('.digit').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const digit = e.target.innerText;   // '0' ~ '9'
+                inputDigit(digit);
+            });
+        });
+
+        document.getElementById('add').addEventListener('click', () => {
+            handleOperator('+');
+        });
+
+        document.getElementById('equal').addEventListener('click', () => {
+            handleEqual();
+        });
+
+        document.getElementById('clear').addEventListener('click', () => {
+            fullReset();
+        });
+
+        // 占位按钮什么也不做 (disabled 已阻止点击)
+
+        // 初始化显示
+        updateDisplay();
+
+        // 可选：键盘支持（简单扩展，方便测试）
+        window.addEventListener('keydown', (e) => {
+            const key = e.key;
+            if (/^[0-9]$/.test(key)) {
+                inputDigit(key);
+            } else if (key === '+') {
+                handleOperator('+');
+            } else if (key === '=' || key === 'Enter') {
+                // 防止与输入框回车冲突
+                if (document.activeElement === targetInput) return;
+                handleEqual();
+            } else if (key === 'c' || key === 'C' || key === 'Escape') {
+                fullReset();
+            }
+        });
+    })();
+</script>
 </body>
 </html>
-
