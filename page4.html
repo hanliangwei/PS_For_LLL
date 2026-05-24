@@ -3,111 +3,164 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-width=1.0">
-    <title>ESP32 网页蓝牙控制台</title>
+    <title>ESP32 网页蓝牙 (连接前看信号版)</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; margin-top: 50px; }
-        button { padding: 15px 30px; font-size: 18px; margin: 10px; cursor: pointer; border-radius: 8px; border: none; }
+        button { padding: 12px 24px; font-size: 16px; margin: 10px; cursor: pointer; border-radius: 8px; border: none; }
+        #searchBtn { background-color: #9c27b0; color: white; }
         #connectBtn { background-color: #4CAF50; color: white; }
         #onBtn { background-color: #2196F3; color: white; }
         #offBtn { background-color: #f44336; color: white; }
         #status { margin-top: 20px; font-weight: bold; color: #555; }
         .hidden { display: none; }
+        
+        /* 信号强度 UI 样式 */
+        #signalPanel { margin-top: 20px; padding: 20px; border-radius: 10px; background: #f9f9f9; display: inline-block; width: 80%; max-width: 400px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .progress-box { width: 100%; height: 25px; background: #e0e0e0; border-radius: 12px; margin: 10px auto; overflow: hidden; }
+        .progress-bar { height: 100%; width: 0%; background: #9e9e9e; transition: width 0.3s ease, background-color 0.3s ease; }
+        .rssi-text { font-size: 24px; font-weight: bold; margin: 5px 0; }
+        
+        #controlPanel { margin-top: 20px; padding-top: 20px; border-top: 2px dashed #ccc; }
     </style>
 </head>
 <body>
 
     <h1>ESP32 网页控制台 🎮</h1>
     
-    <button id="connectBtn">搜索并连接 ESP32</button>
+    <button id="searchBtn">1. 搜索并查看信号</button>
+    
+    <div id="signalPanel" class="hidden">
+        <div>📶 蓝牙信号强度 (连接后将停止更新)</div>
+        <div class="rssi-text"><span id="rssiValue">0</span> / 100</div>
+        <div class="progress-box">
+            <div id="rssiBar" class="progress-bar"></div>
+        </div>
+        <div style="font-size: 12px; color: #888; margin-top: 8px;" id="rawRssi">原始值: -- dBm</div>
+        
+        <button id="connectBtn" class="hidden">2. 正式连接设备</button>
+    </div>
     
     <div id="controlPanel" class="hidden">
-        <button id="onBtn">💡 开灯 (发 1)</button>
-        <button id="offBtn">🌑 关灯 (发 0)</button>
+        <button id="onBtn">💡 开灯</button>
+        <button id="offBtn">🌑 关灯</button>
     </div>
 
-    <div id="status">状态: 未连接</div>
+    <div id="status">状态: 待命</div>
 
     <script>
-        // 这里必须和 ESP32 代码里的 UUID 保持一模一样！
         const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
         const CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
         let bluetoothDevice;
         let controlCharacteristic;
 
+        // 获取 DOM 元素
+        const searchBtn = document.getElementById('searchBtn');
         const connectBtn = document.getElementById('connectBtn');
         const onBtn = document.getElementById('onBtn');
         const offBtn = document.getElementById('offBtn');
         const statusDiv = document.getElementById('status');
+        const signalPanel = document.getElementById('signalPanel');
         const controlPanel = document.getElementById('controlPanel');
+        
+        const rssiValueDiv = document.getElementById('rssiValue');
+        const rssiBar = document.getElementById('rssiBar');
+        const rawRssiDiv = document.getElementById('rawRssi');
 
-        // 1. 点击连接按钮触发的逻辑
-        connectBtn.addEventListener('click', async () => {
+        // 第一步：只请求设备并监听广播，不进行 GATT 连接
+        searchBtn.addEventListener('click', async () => {
             try {
-                statusDiv.innerText = "状态: 正在请求蓝牙设备...";
+                statusDiv.innerText = "状态: 请在弹窗中选择 ESP32...";
                 
-                // 请求连接设备，只过滤名称为 ESP32_BLE_Demo 的设备，并声明需要用到的 Service
                 bluetoothDevice = await navigator.bluetooth.requestDevice({
                     filters: [{ name: 'ESP32_BLE_Demo' }],
                     optionalServices: [SERVICE_UUID] 
                 });
 
-                statusDiv.innerText = "状态: 正在连接 GATT 服务器...";
-                const server = await bluetoothDevice.gatt.connect();
-
-                statusDiv.innerText = "状态: 正在获取 Service...";
-                const service = await server.getPrimaryService(SERVICE_UUID);
-
-                statusDiv.innerText = "状态: 正在获取 Characteristic...";
-                controlCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
-
-                statusDiv.innerText = "状态: 🎉 连接成功！";
-                statusDiv.style.color = "green";
+                statusDiv.innerText = "状态: 已锁定设备，正在监听信号...";
                 
-                // 显示控制按钮，隐藏连接按钮
-                connectBtn.classList.add('hidden');
-                controlPanel.classList.remove('hidden');
+                // 显示信号面板和第二步的连接按钮，隐藏搜索按钮
+                signalPanel.classList.remove('hidden');
+                connectBtn.classList.remove('hidden');
+                searchBtn.classList.add('hidden');
 
-                // 监听设备断开事件
-                bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
+                // 重点：开启广告监听获取 RSSI
+                await bluetoothDevice.watchAdvertisements();
+                bluetoothDevice.addEventListener('advertisementreceived', updateRssiUI);
 
             } catch (error) {
                 console.error("出错了:", error);
-                statusDiv.innerText = "状态: 连接失败或被取消 (" + error + ")";
-                statusDiv.style.color = "red";
+                statusDiv.innerText = "状态: 搜索被取消或失败";
             }
         });
 
-        // 2. 发送数据的通用函数
-        async function sendCommand(command) {
-            if (!controlCharacteristic) {
-                alert("还未连接到特征值！");
-                return;
-            }
+        // 第二步：正式建立 GATT 连接
+        connectBtn.addEventListener('click', async () => {
+            if (!bluetoothDevice) return;
             try {
-                // 将字符串 (如 "1" 或 "0") 转换为字节流 ArrayBuffer
-                let encoder = new TextEncoder();
-                let data = encoder.encode(command);
+                statusDiv.innerText = "状态: 正在建立实质连接...";
+                connectBtn.disabled = true; // 防狂点
                 
-                // 写入数据到 ESP32
-                await controlCharacteristic.writeValue(data);
-                console.log(`指令 [${command}] 发送成功`);
+                const server = await bluetoothDevice.gatt.connect();
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                controlCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+
+                statusDiv.innerText = "状态: 🎉 连接成功！(信号数值已冻结)";
+                statusDiv.style.color = "green";
+                
+                // 显示控灯面板，隐藏连接按钮
+                controlPanel.classList.remove('hidden');
+                connectBtn.classList.add('hidden');
+
+                bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
+
+            } catch (error) {
+                console.error("连接失败:", error);
+                statusDiv.innerText = "状态: 连接失败";
+                connectBtn.disabled = false;
+            }
+        });
+
+        // 更新信号 UI 的逻辑
+        function updateRssiUI(event) {
+            let rawRssi = event.rssi;
+            rawRssiDiv.innerText = `原始值: ${rawRssi} dBm`;
+
+            let percentage = Math.round((rawRssi + 100) * (100 / 70));
+            percentage = Math.max(0, Math.min(100, percentage));
+
+            rssiValueDiv.innerText = percentage;
+            rssiBar.style.width = percentage + '%';
+
+            if (percentage > 60) rssiBar.style.backgroundColor = '#4CAF50';
+            else if (percentage > 30) rssiBar.style.backgroundColor = '#ff9800';
+            else rssiBar.style.backgroundColor = '#f44336';
+        }
+
+        // 发送指令
+        async function sendCommand(command) {
+            if (!controlCharacteristic) return;
+            try {
+                let encoder = new TextEncoder();
+                await controlCharacteristic.writeValue(encoder.encode(command));
             } catch (error) {
                 console.error("发送失败:", error);
-                statusDiv.innerText = "状态: 发送失败";
             }
         }
 
-        // 3. 按钮绑定发送事件
         onBtn.addEventListener('click', () => sendCommand('1'));
         offBtn.addEventListener('click', () => sendCommand('0'));
 
-        // 断开连接时的处理逻辑
         function onDisconnected() {
-            statusDiv.innerText = "状态: ❌ 设备已断开连接";
+            statusDiv.innerText = "状态: ❌ 设备已断开";
             statusDiv.style.color = "red";
-            connectBtn.classList.remove('hidden');
+            
+            // 恢复初始界面状态
+            searchBtn.classList.remove('hidden');
+            signalPanel.classList.add('hidden');
             controlPanel.classList.add('hidden');
+            connectBtn.classList.add('hidden');
+            connectBtn.disabled = false;
         }
     </script>
 </body>
