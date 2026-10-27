@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>孕期日历 · 从 19 周到预产期</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    background:
+      radial-gradient(1200px 600px at 8% -10%, #ffe6d8 0%, transparent 60%),
+      radial-gradient(900px 520px at 100% 0%, #e2f3ec 0%, transparent 55%),
+      #fbf7f3;
+    color:#3a322e;
+    min-height:100vh;
+    padding:24px 16px 64px;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .wrap{max-width:920px;margin:0 auto}
+
+  /* ---------- 顶部主卡片 ---------- */
+  .hero{
+    position:relative;overflow:hidden;
+    border-radius:26px;
+    padding:26px 26px 22px;
+    color:#fff;
+    background:linear-gradient(135deg,#ff9d7a 0%,#ff7f9e 52%,#b47ae0 100%);
+    box-shadow:0 24px 48px -28px rgba(255,120,150,.95);
+  }
+  .hero::before,.hero::after{
+    content:"";position:absolute;border-radius:50%;background:rgba(255,255,255,.14);
+  }
+  .hero::before{width:260px;height:260px;top:-120px;right:-70px}
+  .hero::after{width:190px;height:190px;bottom:-115px;left:-45px}
+  .hero > *{position:relative;z-index:1}
+
+  .kicker{font-size:.78rem;letter-spacing:.14em;opacity:.92;font-weight:500}
+
+  h1{
+    display:flex;align-items:baseline;gap:2px;
+    font-size:1.15rem;font-weight:600;letter-spacing:.02em;
+    margin:12px 0 16px;
+  }
+  h1 .n{font-size:2.9rem;font-weight:800;line-height:1;letter-spacing:-.02em}
+  h1 .n.s{font-size:2.1rem;margin-left:12px}
+
+  .stats{display:flex;flex-wrap:wrap;gap:8px}
+  .stats span{
+    background:rgba(255,255,255,.22);
+    border:1px solid rgba(255,255,255,.28);
+    padding:5px 13px;border-radius:999px;
+    font-size:.76rem;letter-spacing:.02em;
+    backdrop-filter:blur(4px);
+  }
+
+  .progress{
+    height:9px;border-radius:99px;background:rgba(255,255,255,.25);
+    overflow:hidden;margin-top:20px;
+  }
+  .progress i{
+    display:block;height:100%;border-radius:99px;
+    background:linear-gradient(90deg,rgba(255,255,255,.9),#fff);
+    box-shadow:0 0 14px rgba(255,255,255,.9);
+  }
+  .scale{
+    display:flex;justify-content:space-between;
+    font-size:.7rem;opacity:.9;margin-top:9px;
+  }
+
+  /* ---------- 图例 ---------- */
+  .legend{
+    display:flex;gap:16px;flex-wrap:wrap;
+    margin:20px 4px 14px;
+    font-size:.76rem;color:#8a7c75;
+  }
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+
+  /* ---------- 日期网格 ---------- */
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(96px,1fr));
+    gap:10px;
+  }
+
+  .cell{
+    position:relative;
+    background:#fff;
+    border-radius:14px;
+    padding:13px 6px 11px;
+    text-align:center;
+    border:1.5px solid transparent;
+    box-shadow:0 1px 2px rgba(80,50,40,.05),0 8px 18px -14px rgba(80,50,40,.5);
+    transition:transform .18s ease, box-shadow .18s ease;
+  }
+  .cell:hover{
+    transform:translateY(-3px);
+    box-shadow:0 4px 10px rgba(80,50,40,.08),0 14px 24px -14px rgba(80,50,40,.55);
+  }
+
+  .cell .dt{font-size:.85rem;font-weight:600;letter-spacing:.01em}
+  .cell .wd{font-size:.66rem;color:#b0a49e;margin-top:3px}
+  .cell .ga{
+    display:inline-block;margin-top:9px;
+    font-size:.66rem;font-weight:600;letter-spacing:.01em;
+    padding:3px 7px;border-radius:99px;
+  }
+
+  /* 阶段配色 */
+  .cell.early .ga{background:#fbe8f1;color:#b34a7c}
+  .cell.mid   .ga{background:#e5f6ef;color:#2c8b6d}
+  .cell.late  .ga{background:#fdeee3;color:#c26a2c}
+
+  /* 今天 */
+  .cell.today{
+    border-color:#ff8f6b;
+    transform:translateY(-2px);
+    animation:pulse 2.6s ease-in-out infinite;
+  }
+  .cell.today:hover{transform:translateY(-4px)}
+  @keyframes pulse{
+    0%,100%{box-shadow:0 0 0 4px rgba(255,143,107,.18),0 14px 26px -14px rgba(255,143,107,.85)}
+    50%    {box-shadow:0 0 0 9px rgba(255,143,107,.07),0 14px 26px -14px rgba(255,143,107,.85)}
+  }
+  .tag{
+    position:absolute;top:-9px;left:50%;transform:translateX(-50%);
+    background:linear-gradient(135deg,#ffa06e,#ff6f91);
+    color:#fff;font-size:.6rem;font-weight:600;
+    padding:2px 9px;border-radius:99px;white-space:nowrap;
+    box-shadow:0 6px 12px -6px rgba(255,111,145,.9);
+  }
+
+  /* 已过去的日子 */
+  .cell.past{opacity:.5}
+  .cell.past:hover{opacity:1}
+
+  /* 预产期 */
+  .cell.edd{
+    border-color:#e6c26a;
+    background:linear-gradient(180deg,#fffdf6,#fff3d9);
+  }
+  .cell.edd .ga{background:#f9e8b8;color:#a97c15}
+
+  /* 里程碑小星星 */
+  .star{
+    position:absolute;top:5px;right:6px;
+    font-size:.55rem;line-height:1;color:#f0b429;opacity:.9;
+  }
+
+  footer{
+    text-align:center;margin-top:36px;
+    font-size:.76rem;color:#b6a9a2;letter-spacing:.06em;
+  }
+
+  @media (max-width:400px){
+    h1 .n{font-size:2.4rem}
+    h1 .n.s{font-size:1.8rem}
+    .hero{padding:22px 20px 20px;border-radius:22px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="kicker" id="kicker"></div>
+    <h1><span class="n" id="hw">19</span>周<span class="n s" id="hd">+0</span>天</h1>
+    <div class="stats">
+      <span id="stDays"></span>
+      <span id="stLeft"></span>
+    </div>
+    <div class="progress"><i id="bar" style="width:0%"></i></div>
+    <div class="scale">
+      <span>0 周</span>
+      <span>预产期 2027 年 3 月 16 日</span>
+      <span>40 周</span>
+    </div>
+  </header>
+
+  <div class="legend">
+    <span><i style="background:#c9ede0"></i>孕中期 14–27 周</span>
+    <span><i style="background:#fbe0cd"></i>孕晚期 28–40 周</span>
+    <span><i style="background:#ff8f6b"></i>今天</span>
+    <span><i style="background:#f0d18a"></i>里程碑</span>
+    <span><i style="background:#e4dcd7"></i>已过去</span>
+  </div>
+
+  <main class="grid" id="grid"></main>
+
+  <footer>每一天，都在悄悄长大 🌱</footer>
+
+</div>
+
+<script>
+(function () {
+  /* ====== 基准数据（只依赖末次月经日，其余全部按系统时间推算） ====== */
+  const LMP      = new Date(2026, 5, 9);   // 2026-06-09，对应 2026-10-20 = 19周+0天
+  const START_GA = 19 * 7;                 // 日历起点：19周+0天（133 天）
+  const TOTAL_GA = 40 * 7;                 // 预产期：280 天
+  const DAY      = 86400000;
+
+  const WEEKDAY = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+  const MILESTONES = {
+    168: '24 周 · 医学上具备存活可能',
+    196: '28 周 · 进入孕晚期',
+    259: '37 周 · 足月',
+    280: '预产期到啦'
+  };
+
+  const $ = id => document.getElementById(id);
+  // 两个本地零点相减后取整，避免夏令时造成的 ±1 小时误差
+  const dayDiff = (a, b) => Math.round((a - b) / DAY);
+
+  function render(first) {
+    /* ---- 读取系统时间 ---- */
+    const now   = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayGA = dayDiff(today, LMP);           // 今天对应的孕天数
+
+    /* ---- 顶部卡片 ---- */
+    const g = Math.max(todayGA, 0);
+    const left = TOTAL_GA - todayGA;
+    $('kicker').textContent =
+      `${today.getFullYear()} 年 ${today.getMonth() + 1} 月 ${today.getDate()} 日 · ${WEEKDAY[today.getDay()]}`;
+    $('hw').textContent = Math.floor(g / 7);
+    $('hd').textContent = '+' + (g % 7);
+    $('stDays').textContent = `已孕 ${g} 天`;
+    $('stLeft').textContent = left >= 0 ? `距离预产期 ${left} 天` : `已超预产期 ${-left} 天`;
+    $('bar').style.width = Math.min(100, Math.max(0, g / TOTAL_GA * 100)).toFixed(1) + '%';
+
+    /* ---- 日期网格 ---- */
+    let html = '';
+    for (let ga = START_GA; ga <= TOTAL_GA; ga++) {
+      const d = new Date(LMP.getFullYear(), LMP.getMonth(), LMP.getDate() + ga);
+      const w = Math.floor(ga / 7);
+      const r = ga % 7;
+      const phase = ga < 14 * 7 ? 'early' : (ga < 28 * 7 ? 'mid' : 'late');
+
+      const cls = ['cell', phase];
+      if (ga === todayGA)  cls.push('today');
+      else if (ga < todayGA) cls.push('past');
+      if (ga === TOTAL_GA) cls.push('edd');
+
+      const ms = MILESTONES[ga];
+      html += `<div class="${cls.join(' ')}" title="${ms ? ms : w + '周' + r + '天'}">`;
+      if (ga === todayGA) html += '<span class="tag">今天</span>';
+      if (ms)             html += '<span class="star">★</span>';
+      html += `<div class="dt">${d.getMonth() + 1}月${d.getDate()}日</div>
+               <div class="wd">${WEEKDAY[d.getDay()]}</div>
+               <div class="ga">${w}周+${r}天</div>
+             </div>`;
+    }
+    $('grid').innerHTML = html;
+
+    if (first) {
+      const el = document.querySelector('.cell.today');
+      if (el) el.scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  /* 跨过午夜自动刷新；切回标签页时也刷新 */
+  function scheduleMidnight() {
+    const n = new Date();
+    const next = new Date(n.getFullYear(), n.getMonth(), n.getDate() + 1, 0, 0, 2);
+    setTimeout(() => { render(); scheduleMidnight(); }, next - n);
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
+
+  render(true);
+  scheduleMidnight();
+})();
+</script>
+</body>
+</html>
